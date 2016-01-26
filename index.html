@@ -1,0 +1,414 @@
+<!doctype html>
+<html lang="en" ng-app="budgetApp">
+<head>
+  <meta charset="utf-8">
+  <title>Budget</title>
+  <link rel="stylesheet" href="//netdna.bootstrapcdn.com/bootstrap/3.0.3/css/bootstrap.min.css">
+
+  <style>
+    body {
+      margin: 10px;
+      min-width: 320px;
+    }
+    .dollar-amount {
+      text-align: right;
+    }
+  </style>
+
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script>
+  <script src="https://netdna.bootstrapcdn.com/bootstrap/3.0.3/js/bootstrap.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/underscore.js/1.8.3/underscore-min.js"></script>
+  <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.4.3/angular.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/angular-local-storage/0.2.2/angular-local-storage.min.js"></script>
+
+  <script type="text/javascript">
+    var app = angular.module('budgetApp', ['LocalStorageModule']);
+
+    app.config(function(localStorageServiceProvider) {
+      localStorageServiceProvider
+        .setPrefix('budgetApp');
+    });
+
+    app.controller('MainCtrl', function($scope, localStorageService) {
+
+      $scope.incomes = localStorageService.get('incomes');
+      $scope.expenses = localStorageService.get('expenses');
+
+      if ($scope.incomes === null) {
+        $scope.incomes = [];
+      }
+      if ($scope.expenses === null) {
+        $scope.expenses = [];
+      }
+
+      $scope.totalIncomes = {
+        weekly: 0,
+        fortnightly: 0,
+        monthly: 0,
+        quarterly: 0,
+        yearly: 0
+      };
+
+      $scope.totalExpenses = {
+        weekly: 0,
+        fortnightly: 0,
+        monthly: 0,
+        quarterly: 0,
+        yearly: 0
+      };
+
+      $scope.persistIncomes = function() {
+        localStorageService.set('incomes', $scope.incomes);
+      };
+
+      $scope.persistExpenses = function() {
+        localStorageService.set('expenses', $scope.expenses);
+      };
+
+      $scope.removeIncome =  function(index) {
+        $scope.incomes.splice(index, 1);
+        $scope.persistIncomes();
+        $scope.recalculateTotalIncomes();
+      };
+
+      $scope.removeExpense =  function(index) {
+        $scope.expenses.splice(index, 1);
+        $scope.persistExpenses();
+        $scope.recalculateTotalExpenses();
+      };
+
+      $scope.getWeeklyAmount = function(income) {
+        if (income.type === 'weekly') {
+          return income.amount;
+        }
+
+        return $scope.getYearlyAmount(income) / 52;
+      };
+
+      $scope.getFortnightlyAmount = function(income) {
+        if (income.type === 'fortnightly') {
+          return income.amount;
+        }
+
+        return $scope.getYearlyAmount(income) / 26;
+      };
+
+      $scope.getMonthlyAmount = function(income) {
+        if (income.type === 'monthly') {
+          return income.amount;
+        }
+
+        return $scope.getYearlyAmount(income) / 12;
+      };
+
+      $scope.getYearlyAmount = function(income) {
+        if (income.type === 'yearly') {
+          return income.amount;
+        }
+        if (income.type === 'monthly') {
+          return income.amount * 12;
+        }
+        if (income.type === 'quarterly') {
+          return income.amount * 4;
+        }
+        if (income.type === 'fortnightly') {
+          return income.amount * 26;
+        }
+        if (income.type === 'weekly') {
+          return income.amount * 52;
+        }
+      };
+
+      $scope.recalculateTotalIncomes = function() {
+        $scope.totalIncomes = {
+          weekly: 0,
+          fortnightly: 0,
+          monthly: 0,
+          yearly: 0
+        };
+        _.each($scope.incomes, function(income) {
+          $scope.totalIncomes.weekly += $scope.getWeeklyAmount(income);
+          $scope.totalIncomes.fortnightly += $scope.getFortnightlyAmount(income);
+          $scope.totalIncomes.monthly += $scope.getMonthlyAmount(income);
+          $scope.totalIncomes.yearly += $scope.getYearlyAmount(income);
+        });
+      };
+
+      $scope.recalculateTotalExpenses = function() {
+        $scope.totalExpenses = {
+          weekly: 0,
+          fortnightly: 0,
+          monthly: 0,
+          yearly: 0
+        };
+        _.each($scope.expenses, function(expense) {
+          $scope.totalExpenses.weekly += $scope.getWeeklyAmount(expense);
+          $scope.totalExpenses.fortnightly += $scope.getFortnightlyAmount(expense);
+          $scope.totalExpenses.monthly += $scope.getMonthlyAmount(expense);
+          $scope.totalExpenses.yearly += $scope.getYearlyAmount(expense);
+        });
+      };
+
+      $scope.recalculateTotalIncomes();
+      $scope.recalculateTotalExpenses();
+
+      $scope.moneyFormat = function(amount) {
+        return '$' + amount.toFixed(2).replace(/(\d)(?=(\d{3})+\.)/g, '$1,');
+      };
+
+      $scope.showModal = false;
+      $scope.modalType = '';
+      $scope.input = {
+        type: '',
+        label: '',
+        amount: '0'
+      };
+      $scope.activeIndex = 0;
+
+      $scope.displayModal = function(type) {
+        $scope.modalType = type;
+        $scope.showModal = true;
+      };
+
+      $scope.addIncome = function() {
+        $scope.input.type = '';
+        $scope.input.label = '';
+        $scope.input.amount = '0';
+        $scope.displayModal('AddIncome');
+      };
+
+      $scope.editIncome = function(index) {
+        $scope.activeIndex = index;
+        $scope.input.type = $scope.incomes[index].type;
+        $scope.input.label = $scope.incomes[index].label;
+        $scope.input.amount = $scope.incomes[index].amount;
+        $scope.displayModal('EditIncome');
+      };
+
+      $scope.addExpense = function() {
+        $scope.input.type = '';
+        $scope.input.label = '';
+        $scope.input.amount = '0';
+        $scope.displayModal('AddExpense');
+      };
+
+      $scope.editExpense = function(index) {
+        $scope.activeIndex = index;
+        $scope.input.type = $scope.expenses[index].type;
+        $scope.input.label = $scope.expenses[index].label;
+        $scope.input.amount = $scope.expenses[index].amount;
+        $scope.displayModal('EditExpense');
+      };
+
+      $scope.modalSubmit = function() {
+        if ($scope.modalType == 'AddIncome') {
+          $scope.incomes.push({
+            type: $scope.input.type,
+            label: $scope.input.label,
+            amount: parseFloat($scope.input.amount)
+          });
+          $scope.persistIncomes();
+          $scope.recalculateTotalIncomes();
+        }
+        if ($scope.modalType == 'EditIncome') {
+          $scope.incomes[$scope.activeIndex].type = $scope.input.type;
+          $scope.incomes[$scope.activeIndex].label = $scope.input.label;
+          $scope.incomes[$scope.activeIndex].amount = parseFloat($scope.input.amount)
+          $scope.persistIncomes();
+          $scope.recalculateTotalIncomes();
+        }
+        if ($scope.modalType == 'AddExpense') {
+          $scope.expenses.push({
+            type: $scope.input.type,
+            label: $scope.input.label,
+            amount: parseFloat($scope.input.amount)
+          });
+          $scope.persistExpenses();
+          $scope.recalculateTotalExpenses();
+        }
+        if ($scope.modalType == 'EditExpense') {
+          $scope.expenses[$scope.activeIndex].type = $scope.input.type;
+          $scope.expenses[$scope.activeIndex].label = $scope.input.label;
+          $scope.expenses[$scope.activeIndex].amount = parseFloat($scope.input.amount)
+          $scope.persistExpenses();
+          $scope.recalculateTotalExpenses();
+        }
+
+        $scope.showModal = false;
+      };
+    });
+
+    app.directive('modal', function () {
+        return {
+          template: '<div class="modal fade">' +
+              '<div class="modal-dialog">' +
+                '<div class="modal-content">' +
+                  '<div class="modal-header">' +
+                    '<button type="button" class="close" data-dismiss="modal" aria-hidden="true">&times;</button>' +
+                    '<h4 class="modal-title">{{ title }}</h4>' +
+                  '</div>' +
+                  '<div class="modal-body" ng-transclude></div>' +
+                '</div>' +
+              '</div>' +
+            '</div>',
+          restrict: 'E',
+          transclude: true,
+          replace:true,
+          scope:true,
+          link: function postLink(scope, element, attrs) {
+            scope.title = attrs.title;
+
+            scope.$watch(attrs.visible, function(value){
+              if(value == true)
+                $(element).modal('show');
+              else
+                $(element).modal('hide');
+            });
+
+            $(element).on('shown.bs.modal', function(){
+              scope.$apply(function(){
+                scope.$parent[attrs.visible] = true;
+              });
+            });
+
+            $(element).on('hidden.bs.modal', function(){
+              scope.$apply(function(){
+                scope.$parent[attrs.visible] = false;
+              });
+            });
+          }
+        };
+      });
+  </script>
+</head>
+<body ng-controller="MainCtrl">
+  <h1>Budget</h1>
+
+  <h2>Income</h2>
+  <button type="button" class="btn btn-primary" ng-click="addIncome()"><span class="glyphicon glyphicon-plus" aria-hidden="true"></span></button>
+  <table class="income-table" border="1">
+    <tr>
+      <td></td>
+      <td>Type</td>
+      <td>Amount</td>
+      <td>Weekly</td>
+      <td>Fortnightly</td>
+      <td>Monthly</td>
+      <td>Yearly</td>
+      <td>Edit</td>
+      <td>Remove</td>
+    </tr>
+    <tr ng-repeat="income in incomes track by $index">
+      <td>{{ income.label }}</td>
+      <td>{{ income.type }}</td>
+      <td class="dollar-amount">{{ moneyFormat(income.amount) }}</td>
+      <td class="dollar-amount">{{ moneyFormat(getWeeklyAmount(income)) }}</td>
+      <td class="dollar-amount">{{ moneyFormat(getFortnightlyAmount(income)) }}</td>
+      <td class="dollar-amount">{{ moneyFormat(getMonthlyAmount(income)) }}</td>
+      <td class="dollar-amount">{{ moneyFormat(getYearlyAmount(income)) }}</td>
+      <td><button type="button" class="btn btn-warning" ng-click="editIncome($index)"><span class="glyphicon glyphicon-pencil" aria-hidden="true"></span></button></td>
+      <td><button type="button" class="btn btn-danger" ng-click="removeIncome($index)"><span class="glyphicon glyphicon-remove" aria-hidden="true"></span></button></td>
+    </tr>
+    <tr>
+      <td>Total</td>
+      <td></td>
+      <td></td>
+      <td class="dollar-amount">{{ moneyFormat(totalIncomes.weekly) }}</td>
+      <td class="dollar-amount">{{ moneyFormat(totalIncomes.fortnightly) }}</td>
+      <td class="dollar-amount">{{ moneyFormat(totalIncomes.monthly) }}</td>
+      <td class="dollar-amount">{{ moneyFormat(totalIncomes.yearly) }}</td>
+      <td></td>
+      <td></td>
+    </tr>
+  </table>
+
+  <h2>Expenses</h2>
+  <button type="button" class="btn btn-primary" ng-click="addExpense()"><span class="glyphicon glyphicon-plus" aria-hidden="true"></span></button>
+  <table class="expenses-table" border="1">
+    <tr>
+      <td></td>
+      <td>Type</td>
+      <td>Amount</td>
+      <td>Weekly</td>
+      <td>Fortnightly</td>
+      <td>Monthly</td>
+      <td>Yearly</td>
+      <td>Edit</td>
+      <td>Remove</td>
+    </tr>
+    <tr ng-repeat="expense in expenses track by $index">
+      <td>{{ expense.label }}</td>
+      <td>{{ expense.type }}</td>
+      <td class="dollar-amount">{{ moneyFormat(expense.amount) }}</td>
+      <td class="dollar-amount">{{ moneyFormat(getWeeklyAmount(expense)) }}</td>
+      <td class="dollar-amount">{{ moneyFormat(getFortnightlyAmount(expense)) }}</td>
+      <td class="dollar-amount">{{ moneyFormat(getMonthlyAmount(expense)) }}</td>
+      <td class="dollar-amount">{{ moneyFormat(getYearlyAmount(expense)) }}</td>
+      <td><button type="button" class="btn btn-warning" ng-click="editExpense($index)"><span class="glyphicon glyphicon-pencil" aria-hidden="true"></span></button></td>
+      <td><button type="button" class="btn btn-danger" ng-click="removeExpense($index)"><span class="glyphicon glyphicon-remove" aria-hidden="true"></span></button></td>
+    </tr>
+    <tr>
+      <td>Total</td>
+      <td></td>
+      <td></td>
+      <td class="dollar-amount">{{ moneyFormat(totalExpenses.weekly) }}</td>
+      <td class="dollar-amount">{{ moneyFormat(totalExpenses.fortnightly) }}</td>
+      <td class="dollar-amount">{{ moneyFormat(totalExpenses.monthly) }}</td>
+      <td class="dollar-amount">{{ moneyFormat(totalExpenses.yearly) }}</td>
+      <td></td>
+      <td></td>
+    </tr>
+  </table>
+
+  <h2>Savings</h2>
+  <table class="savings-table" border="1">
+    <tr>
+      <td></td>
+      <td>Type</td>
+      <td>Amount</td>
+      <td>Weekly</td>
+      <td>Fortnightly</td>
+      <td>Monthly</td>
+      <td>Yearly</td>
+      <td>Edit</td>
+      <td>Remove</td>
+    </tr>
+    <tr>
+      <td>Total</td>
+      <td></td>
+      <td></td>
+      <td class="dollar-amount">{{ moneyFormat(totalIncomes.weekly - totalExpenses.weekly) }}</td>
+      <td class="dollar-amount">{{ moneyFormat(totalIncomes.fortnightly - totalExpenses.fortnightly) }}</td>
+      <td class="dollar-amount">{{ moneyFormat(totalIncomes.monthly - totalExpenses.monthly) }}</td>
+      <td class="dollar-amount">{{ moneyFormat(totalIncomes.yearly - totalExpenses.yearly) }}</td>
+      <td></td>
+      <td></td>
+    </tr>
+  </table>
+
+  <modal title="Add/Edit" visible="showModal">
+    <form role="form">
+      <div class="form-group">
+        <label for="type">Type</label>
+        <select class="form-control" id="type" ng-model="input.type">
+          <option value=""></option>
+          <option value="weekly">Weekly</option>
+          <option value="fortnightly">Fortnightly</option>
+          <option value="monthly">Monthly</option>
+          <option value="quarterly">Quarterly</option>
+          <option value="yearly">Yearly</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="label">Label</label>
+        <input type="text" class="form-control" id="label" placeholder="Label" ng-model="input.label" />
+      </div>
+      <div class="form-group">
+        <label for="amount">Amount</label>
+        <input type="text" class="form-control" id="amount" placeholder="Amount" ng-model="input.amount" />
+      </div>
+      <button type="button" class="btn btn-default" ng-click="modalSubmit()">Submit</button>
+    </form>
+  </modal>
+</body>
+</html>
